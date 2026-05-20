@@ -99,6 +99,11 @@ def next_available_port(host: str, preferred: int) -> int:
     raise RuntimeError(f"No hay puertos libres cerca de {preferred}")
 
 
+def local_api_url(host: str, port: int) -> str:
+    report_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    return f"http://{report_host}:{port}"
+
+
 def start_process(
     name: str,
     command: list[str],
@@ -179,6 +184,8 @@ def run() -> int:
     env = process_env()
     worker_count = resolved_worker_count(args)
     api_port = next_available_port(args.api_host, args.api_port)
+    api_url = local_api_url(args.api_host, api_port)
+    env["GEARMAN_DEMO_API_URL"] = api_url
     if api_port != args.api_port:
         print(f"[main] Puerto {args.api_port} ocupado; usaré {api_port} para la API", flush=True)
 
@@ -200,28 +207,6 @@ def run() -> int:
 
         gearmand_process = start_gearmand(args)
         processes.append(("gearmand", gearmand_process))
-
-        for worker_index in range(worker_count):
-            worker_process = start_process(
-                f"worker-{worker_index + 1}",
-                [
-                    sys.executable,
-                    "scripts/run_worker.py",
-                    "--host",
-                    args.gearman_host,
-                    "--port",
-                    str(args.gearman_port),
-                    "--worker-index",
-                    str(worker_index),
-                    "--worker-count",
-                    str(worker_count),
-                    "--worker-id",
-                    cpu_worker_id(worker_index),
-                ],
-                env,
-                startup_delay=0.05,
-            )
-            processes.append((f"worker-{worker_index + 1}", worker_process))
 
         api_process = start_process(
             "api",
@@ -246,6 +231,30 @@ def run() -> int:
             print(f"[main] Swagger en http://{args.api_host}:{api_port}/docs", flush=True)
         else:
             raise RuntimeError("La API no abrió el puerto esperado")
+
+        for worker_index in range(worker_count):
+            worker_process = start_process(
+                f"worker-{worker_index + 1}",
+                [
+                    sys.executable,
+                    "scripts/run_worker.py",
+                    "--host",
+                    args.gearman_host,
+                    "--port",
+                    str(args.gearman_port),
+                    "--worker-index",
+                    str(worker_index),
+                    "--worker-count",
+                    str(worker_count),
+                    "--worker-id",
+                    cpu_worker_id(worker_index),
+                    "--api-url",
+                    api_url,
+                ],
+                env,
+                startup_delay=0.05,
+            )
+            processes.append((f"worker-{worker_index + 1}", worker_process))
 
         print("[main] Presiona Ctrl-C para detener todo", flush=True)
         while True:

@@ -486,7 +486,8 @@
 
         .metrics,
         .dashboard-grid,
-        .workspace {
+        .workspace,
+        .visual-body {
           grid-template-columns: 1fr;
         }
       }
@@ -503,7 +504,268 @@
           grid-template-columns: 1fr;
         }
       }
+
+      /* Visual Dashboard CSS styles */
+      .visual-panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .panel-header-visual {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfe;
+      }
+      
+      .panel-header-visual h2 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .active-task-pill {
+        background: linear-gradient(135deg, var(--accent), #1d4ed8);
+        color: white;
+        padding: 0.2rem 0.65rem;
+        border-radius: 9999px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.15);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+      
+      .active-task-pill span {
+        font-size: 0.85rem;
+        animation: pulse-dot 1.5s infinite;
+      }
+      
+      .visual-body {
+        padding: 1rem;
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 1rem;
+      }
+      
+      .cores-container, .charts-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      
+      .cores-container h3, .chart-box h3 {
+        margin: 0;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      
+      /* Cores Grid */
+      .cores-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 0.65rem;
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.75rem;
+        max-height: 295px;
+        overflow-y: auto;
+      }
+      
+      /* Single Core Card styling */
+      .core-card {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.6rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        position: relative;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      }
+      
+      .core-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+        border-color: #cbd5e1;
+      }
+      
+      .core-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .core-name {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-weight: 700;
+        font-size: 0.8rem;
+        color: var(--ink);
+      }
+      
+      .core-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        transition: background 0.2s ease;
+      }
+      
+      /* Status dynamic classes */
+      .core-card.ready {
+        border-left: 3px solid var(--accent-2);
+      }
+      .core-card.ready .core-indicator {
+        background: var(--accent-2);
+        box-shadow: 0 0 5px var(--accent-2);
+      }
+      
+      .core-card.busy {
+        border-left: 3px solid var(--accent);
+        background: linear-gradient(to bottom right, white, rgba(59, 130, 246, 0.02));
+        animation: active-glow 2s infinite ease-in-out;
+      }
+      .core-card.busy .core-indicator {
+        background: var(--accent);
+        box-shadow: 0 0 7px var(--accent);
+      }
+      
+      .core-card.failed {
+        border-left: 3px solid var(--error);
+      }
+      .core-card.failed .core-indicator {
+        background: var(--error);
+        box-shadow: 0 0 5px var(--error);
+      }
+
+      .core-card.stopped {
+        border-left: 3px solid var(--muted);
+        opacity: 0.6;
+      }
+      
+      .core-meta {
+        font-size: 0.68rem;
+        color: var(--muted);
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+      }
+      
+      .core-task-running {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #1e40af;
+        background: #eff6ff;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 0.15rem;
+        border: 1px solid #bfdbfe;
+      }
+
+      .core-task-running.demo-shard {
+        color: #0f766e;
+        background: #f0fdfa;
+        border-color: #99f6e4;
+      }
+
+      .core-task-running.demo-bg_log {
+        color: #b45309;
+        background: #fef3c7;
+        border-color: #fde68a;
+      }
+
+      .core-task-running.demo-analyze {
+        color: #1e40af;
+        background: #eff6ff;
+        border-color: #bfdbfe;
+      }
+      
+      .core-stats-bar {
+        height: 4px;
+        background: #f1f5f9;
+        border-radius: 2px;
+        overflow: hidden;
+        display: flex;
+        margin-top: 0.15rem;
+      }
+      
+      .core-progress-ok {
+        height: 100%;
+        background: var(--accent-2);
+      }
+      
+      .core-progress-err {
+        height: 100%;
+        background: var(--error);
+      }
+      
+      /* Charts layout */
+      .charts-container {
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      
+      .chart-box {
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      
+      .canvas-wrapper {
+        position: relative;
+        flex: 1;
+        width: 100%;
+        height: 95px;
+        min-height: 95px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .fallback-chart-msg {
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-style: italic;
+        text-align: center;
+        padding: 0.5rem;
+      }
+      
+      @keyframes active-glow {
+        0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); }
+        50% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.3); }
+      }
+      
+      @keyframes pulse-dot {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.25); opacity: 0.6; }
+        100% { transform: scale(1); opacity: 1; }
+      }
     </style>
+    <!-- Cargamos Chart.js desde CDN para gráficas profesionales -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <div class="shell">
@@ -538,6 +800,43 @@
           <div class="metric"><span>Duración promedio</span><strong id="d-avg">-</strong></div>
         </section>
 
+        <!-- PANEL GRÁFICO DE OCUPACIÓN -->
+        <section class="visual-panel">
+          <header class="panel-header-visual">
+            <h2>Ocupación de Workers</h2>
+            <div class="active-task-pill" id="active-workers-pill">
+              <span>●</span> 0 / 0 Activos
+            </div>
+          </header>
+          <div class="visual-body">
+            <!-- Grid de Cores / Workers -->
+            <div class="cores-container">
+              <h3>Distribución de Cores</h3>
+              <div class="cores-grid" id="visual-cores-grid">
+                <div style="grid-column: 1/-1; padding: 1.5rem; text-align: center; color: var(--muted); font-size: 0.8rem;">
+                  Esperando reportes de workers...
+                </div>
+              </div>
+            </div>
+            
+            <!-- Gráficas Estadísticas -->
+            <div class="charts-container">
+              <div class="chart-box">
+                <h3>Ocupación del Pool (Tiempo Real)</h3>
+                <div class="canvas-wrapper">
+                  <canvas id="occupancyLineChart"></canvas>
+                </div>
+              </div>
+              <div class="chart-box">
+                <h3>Trabajos Procesados</h3>
+                <div class="canvas-wrapper">
+                  <canvas id="workloadBarChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="panel">
           <header>
             <h2>Cuadro de mando Gearman</h2>
@@ -550,10 +849,13 @@
                   <th>worker</th>
                   <th>pid</th>
                   <th>estado</th>
-                  <th>tarea</th>
-                  <th>etapa</th>
+                  <th>en curso</th>
+                  <th>procesados</th>
+                  <th>fallidos</th>
+                  <th>tarea actual</th>
+                  <th>último job</th>
                   <th>duración</th>
-                  <th>último evento</th>
+                  <th>actualizado</th>
                 </tr>
               </thead>
               <tbody id="worker-table"></tbody>
@@ -696,6 +998,95 @@
       let selectedJobId = null;
       let logTimer = null;
 
+      // Control y almacenamiento gráfico
+      let occupancyChart = null;
+      let workloadChart = null;
+      const MAX_HISTORY_POINTS = 30;
+
+      function initCharts() {
+        if (typeof Chart === "undefined") {
+          document.querySelectorAll(".canvas-wrapper").forEach(wrapper => {
+            wrapper.innerHTML = `<div class="fallback-chart-msg">Librería de gráficos no disponible en modo offline. Los datos se actualizan en la tabla inferior y la cuadrícula de cores.</div>`;
+          });
+          return;
+        }
+
+        try {
+          const ctxLine = $("occupancyLineChart").getContext("2d");
+          occupancyChart = new Chart(ctxLine, {
+            type: "line",
+            data: {
+              labels: Array(MAX_HISTORY_POINTS).fill(""),
+              datasets: [{
+                label: "Ocupación %",
+                data: Array(MAX_HISTORY_POINTS).fill(0),
+                borderColor: "#2563eb",
+                backgroundColor: "rgba(37, 99, 235, 0.08)",
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: { display: false },
+                y: {
+                  min: 0,
+                  max: 100,
+                  ticks: {
+                    stepSize: 25,
+                    callback: (val) => val + "%",
+                    font: { size: 9 }
+                  },
+                  grid: { color: "rgba(216, 222, 232, 0.4)" }
+                }
+              }
+            }
+          });
+
+          const ctxBar = $("workloadBarChart").getContext("2d");
+          workloadChart = new Chart(ctxBar, {
+            type: "bar",
+            data: {
+              labels: [],
+              datasets: [{
+                label: "Jobs procesados",
+                data: [],
+                backgroundColor: "rgba(15, 118, 110, 0.8)",
+                hoverBackgroundColor: "rgba(15, 118, 110, 1)",
+                borderRadius: 4,
+                borderWidth: 0,
+                barThickness: 8,
+              }]
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: {
+                x: {
+                  beginAtZero: true,
+                  ticks: { stepSize: 1, font: { size: 9 } },
+                  grid: { color: "rgba(216, 222, 232, 0.4)" }
+                },
+                y: {
+                  ticks: { font: { size: 9 } },
+                  grid: { display: false }
+                }
+              }
+            }
+          });
+        } catch (e) {
+          console.error("Error al inicializar gráficos:", e);
+        }
+      }
+
       async function api(path, options = {}) {
         const res = await fetch(path, {
           headers: { "Content-Type": "application/json" },
@@ -790,49 +1181,120 @@
             .join("") || "<div class='log-entry'><span></span><span></span><span></span><span>Sin eventos</span></div>";
       }
 
-      function renderWorkerDashboard(events) {
+      function renderWorkerDashboard(statuses, events) {
         const workerEvents = events.filter((event) => event.worker_id);
-        const workers = new Map();
-        workerEvents
-          .slice()
-          .reverse()
-          .forEach((event) => {
-            workers.set(event.worker_id, event);
-          });
-
         const completed = workerEvents.filter((event) => event.status === "completed");
         const durations = completed
           .map((event) => Number(event.duration_ms))
           .filter((value) => Number.isFinite(value));
         const avg = durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : null;
 
-        $("d-workers").textContent = workers.size;
-        $("d-running").textContent = Array.from(workers.values()).filter((event) =>
-          ["received", "running"].includes(event.status)
-        ).length;
-        $("d-completed").textContent = completed.length;
-        $("d-avg").textContent = avg === null ? "-" : `${avg.toFixed(1)} ms`;
-        $("dashboard-status").textContent = workerEvents.length
-          ? `${workerEvents.length} eventos worker`
-          : "sin eventos worker todavía";
+        const totalWorkers = statuses.length;
+        const activeWorkers = statuses.filter((status) => status.busy).length;
 
-        const rows = Array.from(workers.entries())
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([workerId, event]) => {
-            const duration = event.duration_ms == null ? "-" : `${Number(event.duration_ms).toFixed(1)} ms`;
+        $("d-workers").textContent = totalWorkers;
+        $("d-running").textContent = activeWorkers;
+        $("d-completed").textContent = statuses.reduce((sum, status) => sum + Number(status.jobs_processed || 0), 0);
+        $("d-avg").textContent = avg === null ? "-" : `${avg.toFixed(1)} ms`;
+        $("dashboard-status").textContent = totalWorkers
+          ? `${totalWorkers} workers reportando por HTTP`
+          : "sin reportes de workers todavía";
+
+        const sortedStatuses = statuses
+          .slice()
+          .sort((left, right) => left.worker_id.localeCompare(right.worker_id));
+
+        const rows = sortedStatuses
+          .map((status) => {
+            const duration =
+              status.last_duration_ms == null ? "-" : `${Number(status.last_duration_ms).toFixed(1)} ms`;
+            const updated = status.updated_at ? new Date(status.updated_at).toLocaleTimeString() : "-";
+            const current = status.current_task || "-";
+            const last = status.last_job_type || "-";
             return `
               <tr>
-                <td><code>${workerId}</code></td>
-                <td>${event.pid || "-"}</td>
-                <td><span class="pill ${event.status}">${event.status}</span></td>
-                <td><code>${event.task}</code></td>
-                <td>${event.stage}</td>
+                <td><code>${status.worker_id}</code></td>
+                <td>${status.pid || "-"}</td>
+                <td><span class="pill ${status.status}">${status.status}</span></td>
+                <td>${status.jobs_in_progress || 0}</td>
+                <td>${status.jobs_processed || 0}</td>
+                <td>${status.jobs_failed || 0}</td>
+                <td><code>${current}</code></td>
+                <td><code>${last}</code></td>
                 <td>${duration}</td>
-                <td>${event.message}</td>
+                <td>${updated}</td>
               </tr>`;
           })
           .join("");
-        $("worker-table").innerHTML = rows || "<tr><td colspan='7'>Sin eventos de workers</td></tr>";
+        $("worker-table").innerHTML = rows || "<tr><td colspan='10'>Sin reportes de workers</td></tr>";
+
+        // --- ACTUALIZACIÓN DE GRID VISUAL DE CORES ---
+        $("active-workers-pill").innerHTML = `<span>●</span> ${activeWorkers} / ${totalWorkers} Activos`;
+        $("active-workers-pill").style.background = activeWorkers > 0 ? "linear-gradient(135deg, var(--accent), #1d4ed8)" : "#667085";
+
+        const coreCardsHTML = sortedStatuses.map(status => {
+          const totalJobs = (status.jobs_processed || 0) + (status.jobs_failed || 0);
+          const okPercent = totalJobs > 0 ? ((status.jobs_processed || 0) / totalJobs) * 100 : 0;
+          const errPercent = totalJobs > 0 ? ((status.jobs_failed || 0) / totalJobs) * 100 : 0;
+          
+          let taskHTML = "";
+          if (status.busy && status.current_task) {
+            const taskSanitized = status.current_task.replace(".", "-");
+            taskHTML = `<div class="core-task-running ${taskSanitized}">${status.current_task}</div>`;
+          } else {
+            taskHTML = `<div style="font-size: 0.65rem; color: var(--muted); margin-top: 0.15rem; font-style: italic;">esperando tareas</div>`;
+          }
+
+          return `
+            <div class="core-card ${status.status}">
+              <div class="core-header">
+                <span class="core-name">${status.worker_id}</span>
+                <span class="core-indicator" title="Estado: ${status.status}"></span>
+              </div>
+              <div class="core-meta">
+                <span>PID: ${status.pid || "-"}</span>
+                <span>Procesados: <strong>${status.jobs_processed || 0}</strong></span>
+              </div>
+              ${taskHTML}
+              <div class="core-stats-bar" title="Exitosos: ${status.jobs_processed || 0} | Fallidos: ${status.jobs_failed || 0}">
+                <div class="core-progress-ok" style="width: ${okPercent}%"></div>
+                <div class="core-progress-err" style="width: ${errPercent}%"></div>
+              </div>
+            </div>
+          `;
+        }).join("");
+        $("visual-cores-grid").innerHTML = coreCardsHTML || "<div style='grid-column: 1/-1; padding: 1.5rem; text-align: center; color: var(--muted); font-size: 0.8rem;'>Esperando reportes de workers...</div>";
+
+        // --- INYECCIÓN DE DATOS EN LAS GRÁFICAS DE CHART.JS ---
+        if (typeof Chart !== "undefined") {
+          // 1. Gráfica de Ocupación en Tiempo Real
+          const occupancyPct = totalWorkers > 0 ? (activeWorkers / totalWorkers) * 100 : 0;
+          if (occupancyChart) {
+            const data = occupancyChart.data.datasets[0].data;
+            data.shift();
+            data.push(occupancyPct);
+
+            const labels = occupancyChart.data.labels;
+            labels.shift();
+            labels.push(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+            occupancyChart.update("none"); // Actualizar sin animaciones de transición para máxima fluidez
+          }
+
+          // 2. Gráfica de Trabajos Procesados por Core
+          if (workloadChart) {
+            const labels = sortedStatuses.map(s => s.worker_id);
+            const values = sortedStatuses.map(s => s.jobs_processed || 0);
+
+            workloadChart.data.labels = labels;
+            workloadChart.data.datasets[0].data = values;
+
+            const maxVal = Math.max(...values, 5);
+            workloadChart.options.scales.x.ticks.stepSize = maxVal > 15 ? Math.ceil(maxVal / 5) : 1;
+
+            workloadChart.update();
+          }
+        }
       }
 
       function renderWorkerResults(events) {
@@ -868,12 +1330,13 @@
       }
 
       async function refreshEvents() {
-        const [globalEvents, scopedEvents] = await Promise.all([
+        const [globalEvents, scopedEvents, workerStatuses] = await Promise.all([
           api("/api/events?limit=250"),
           selectedJobId ? api(`/api/jobs/${selectedJobId}/events?limit=250`) : api("/api/events?limit=250"),
+          api("/api/workers-status"),
         ]);
         $("log-scope").textContent = selectedJobId ? `job ${selectedJobId.slice(0, 8)}` : "últimos eventos";
-        renderWorkerDashboard(globalEvents);
+        renderWorkerDashboard(workerStatuses, globalEvents);
         renderWorkerResults(scopedEvents);
         renderEvents(scopedEvents);
       }
@@ -972,15 +1435,23 @@
       $("refresh").addEventListener("click", refresh);
 
       async function bootstrap() {
+        initCharts();
         try {
           const health = await api("/api/health");
           $("server").textContent = health.gearman_server;
           await refresh();
         } catch (err) {
-          $("server").textContent = "sin conexión";
+          $("server").textContent = "sin connection";
           setStatus(String(err), true);
         }
       }
+
+      // Mantener una actualización periódica cada 2.5s si el pool está inactivo
+      window.setInterval(() => {
+        if (!logTimer) {
+          refreshEvents().catch(() => {});
+        }
+      }, 2500);
 
       bootstrap();
     </script>

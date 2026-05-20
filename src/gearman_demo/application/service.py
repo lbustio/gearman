@@ -33,7 +33,49 @@ class GearmanDemoService:
         self._client_factory = client_factory
         self._history: deque[dict[str, Any]] = deque(maxlen=history_limit)
         self._events: deque[dict[str, Any]] = deque(maxlen=history_limit * 10)
+        self._worker_status: dict[str, dict[str, Any]] = {}
         self._lock = Lock()
+        
+        # Iniciar log a nivel de Master
+        self._log_master(
+            "INFO",
+            f"Servicio Master iniciado. Servidor Gearman: {self.server}, Límite Historial: {self.history_limit}"
+        )
+
+    def _log_master(self, level: str, message: str, details: Any | None = None) -> None:
+        try:
+            import json
+            from gearman_demo.gearman.telemetry import event_log_path
+            log_dir = event_log_path().parent
+            log_path = log_dir / "master.log"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+            log_line = f"{timestamp} [MASTER] [{level}] {message}"
+            
+            if details is not None:
+                details_str = json.dumps(to_jsonable(details), ensure_ascii=False, indent=2)
+                indented = "\n".join("    " + line for line in details_str.splitlines())
+                log_line += f"\n{indented}"
+                
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(log_line + "\n")
+        except Exception as e:
+            import sys
+            print(f"[MASTER LOGGING ERROR] {e}", file=sys.stderr, flush=True)
+
+    def _log_pool_status(self) -> None:
+        with self._lock:
+            total = len(self._worker_status)
+            busy_workers = [w_id for w_id, w in self._worker_status.items() if w.get("busy")]
+            idle_workers = [w_id for w_id, w in self._worker_status.items() if not w.get("busy")]
+        
+        busy_str = ", ".join(busy_workers) if busy_workers else "ninguno"
+        idle_str = ", ".join(idle_workers) if idle_workers else "ninguno"
+        self._log_master(
+            "POOL",
+            f"Estado del Pool: {len(busy_workers)}/{total} activos. Activos: [{busy_str}]. Ociosos: [{idle_str}]"
+        )
 
     def _new_client(self) -> Any:
         if self._client_factory is not None:
@@ -100,6 +142,35 @@ class GearmanDemoService:
             job = next((job for job in self._history if job["id"] == local_job_id), None)
         return to_jsonable(job) if job else None
 
+    def update_worker_status(self, status: dict[str, Any]) -> dict[str, Any]:
+        clean_status = to_jsonable(status)
+        worker_id = clean_status["worker_id"]
+        
+        with self._lock:
+            old = self._worker_status.get(worker_id)
+            self._worker_status[worker_id] = clean_status
+            
+        # Registrar cambios de estado significativos
+        if (
+            not old 
+            or old.get("status") != clean_status["status"] 
+            or old.get("busy") != clean_status["busy"] 
+            or old.get("current_task") != clean_status["current_task"]
+        ):
+            self._log_master(
+                "INFO",
+                f"Worker {worker_id} (PID {clean_status['pid']}) reporta cambio de estado: "
+                f"status={clean_status['status']} (busy: {clean_status['busy']}, task: {clean_status['current_task'] or 'ninguna'})"
+            )
+            self._log_pool_status()
+            
+        return clean_status
+
+    def list_worker_status(self) -> list[dict[str, Any]]:
+        with self._lock:
+            statuses = [to_jsonable(status) for status in self._worker_status.values()]
+        return sorted(statuses, key=lambda status: status["worker_id"])
+
     def report(self) -> dict[str, Any]:
         jobs = self.list_jobs()
         totals: dict[str, int] = {
@@ -134,6 +205,10 @@ class GearmanDemoService:
         local_job_id = str(uuid.uuid4())
         now = self._now()
         payload = {"message": message}
+        
+        self._log_master("INFO", f"Job Background Iniciado [{local_job_id}]: task=demo.bg_log", payload)
+        self._log_pool_status()
+        
         self._log_event(
             local_job_id=local_job_id,
             task="demo.bg_log",
@@ -149,6 +224,10 @@ class GearmanDemoService:
                 "demo.bg_log",
                 {**payload, "_trace_job_id": local_job_id},
             )
+            
+            self._log_master("INFO", f"Job Background Aceptado [{local_job_id}]: handle={gearman_handle}")
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.bg_log",
@@ -167,6 +246,9 @@ class GearmanDemoService:
                 "result": {"gearman_handle": gearman_handle},
             }
         except Exception as exc:  # pragma: no cover - depende de red/gearmand
+            self._log_master("ERROR", f"Job Background Fallido [{local_job_id}]: {exc}")
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.bg_log",
@@ -192,8 +274,12 @@ class GearmanDemoService:
     def run_pipeline(self, text: str, shard_size: int, top_n: int) -> dict[str, Any]:
         local_job_id = str(uuid.uuid4())
         now = self._now()
-        payload = {"text": text, "shard_size": shard_size, "top_n": top_n}
+        payload = {"text_chars": len(text), "shard_size": shard_size, "top_n": top_n}
         client = self._new_client()
+        
+        self._log_master("INFO", f"Pipeline Iniciado [{local_job_id}]", payload)
+        self._log_pool_status()
+        
         self._log_event(
             local_job_id=local_job_id,
             task="demo.pipeline",
@@ -204,6 +290,7 @@ class GearmanDemoService:
         )
 
         try:
+            self._log_master("INFO", f"Pipeline [{local_job_id}]: Enviando texto para dividir en shards (shard_size={shard_size})")
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.shard",
@@ -212,12 +299,17 @@ class GearmanDemoService:
                 message="Ejecutando demo.shard",
                 details={"shard_size": shard_size},
             )
+            
             shard_result = submit_sync_job(
                 client,
                 "demo.shard",
                 {"text": text, "shard_size": shard_size, "_trace_job_id": local_job_id},
             )
             shard_count = len(shard_result.get("shards", []))
+            
+            self._log_master("INFO", f"Pipeline [{local_job_id}]: Fragmentación completada. Obtenidos {shard_count} shards.")
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.shard",
@@ -234,7 +326,15 @@ class GearmanDemoService:
                 "sentiment_score": 0,
             }
 
-            for index, shard in enumerate(shard_result.get("shards", []), start=1):
+            from concurrent.futures import ThreadPoolExecutor
+
+            def process_shard(index: int, shard: str) -> dict[str, Any]:
+                self._log_master(
+                    "INFO", 
+                    f"Pipeline [{local_job_id}]: Iniciando procesamiento paralelo de fragmento {index}/{shard_count} (caracteres={len(shard)})"
+                )
+                self._log_pool_status()
+                
                 self._log_event(
                     local_job_id=local_job_id,
                     task="demo.analyze",
@@ -243,17 +343,74 @@ class GearmanDemoService:
                     message=f"Analizando shard {index}/{shard_count}",
                     details={"shard_index": index, "shard_count": shard_count, "chars": len(shard)},
                 )
-                analysis = submit_sync_job(
-                    client,
-                    "demo.analyze",
-                    {
-                        "text": shard,
-                        "top_n": top_n,
-                        "_trace_job_id": local_job_id,
-                        "_trace_shard_index": index,
-                        "_trace_shard_count": shard_count,
-                    },
-                )
+                
+                thread_client = self._new_client()
+                try:
+                    analysis = submit_sync_job(
+                        thread_client,
+                        "demo.analyze",
+                        {
+                            "text": shard,
+                            "top_n": top_n,
+                            "_trace_job_id": local_job_id,
+                            "_trace_shard_index": index,
+                            "_trace_shard_count": shard_count,
+                        },
+                    )
+                    sentiment = analysis.get("sentiment", {})
+                    self._log_master(
+                        "INFO", 
+                        f"Pipeline [{local_job_id}]: Fragmento {index}/{shard_count} finalizado en paralelo. "
+                        f"Tokens={analysis.get('tokens', 0)}, Sentimiento={sentiment.get('score', 0)}"
+                    )
+                    
+                    self._log_event(
+                        local_job_id=local_job_id,
+                        task="demo.analyze",
+                        stage="analyze",
+                        status="completed",
+                        message=f"Shard {index}/{shard_count} analizado",
+                        details={
+                            "shard_index": index,
+                            "tokens": analysis.get("tokens", 0),
+                            "sentiment_score": sentiment.get("score", 0),
+                        },
+                    )
+                    return {"index": index, "analysis": analysis, "success": True}
+                except Exception as thread_exc:
+                    self._log_master(
+                        "ERROR",
+                        f"Pipeline [{local_job_id}]: Falló el procesamiento del fragmento {index}/{shard_count} en paralelo: {thread_exc}"
+                    )
+                    self._log_event(
+                        local_job_id=local_job_id,
+                        task="demo.analyze",
+                        stage="analyze",
+                        status="failed",
+                        message=f"Shard {index}/{shard_count} falló",
+                        details={"shard_index": index, "error": str(thread_exc)},
+                    )
+                    return {"index": index, "error": str(thread_exc), "success": False}
+
+            # Procesamos todos los fragmentos concurrentemente
+            with ThreadPoolExecutor(max_workers=shard_count) as executor:
+                futures = [
+                    executor.submit(process_shard, index, shard)
+                    for index, shard in enumerate(shard_result.get("shards", []), start=1)
+                ]
+                results = [f.result() for f in futures]
+
+            # Si alguno falló, lanzamos error para abortar el pipeline
+            for res in results:
+                if not res["success"]:
+                    raise GearmanServiceError(f"Error procesando fragmento en paralelo: {res.get('error')}")
+
+            # Consolidamos resultados ordenados por su índice original
+            results.sort(key=lambda r: r["index"])
+            
+            for r in results:
+                index = r["index"]
+                analysis = r["analysis"]
                 sentiment = analysis.get("sentiment", {})
                 totals["chars"] += int(analysis.get("chars", 0))
                 totals["tokens"] += int(analysis.get("tokens", 0))
@@ -268,19 +425,10 @@ class GearmanDemoService:
                         "top_tokens": analysis.get("top_tokens", []),
                     }
                 )
-                self._log_event(
-                    local_job_id=local_job_id,
-                    task="demo.analyze",
-                    stage="analyze",
-                    status="completed",
-                    message=f"Shard {index}/{shard_count} analizado",
-                    details={
-                        "shard_index": index,
-                        "tokens": analysis.get("tokens", 0),
-                        "sentiment_score": sentiment.get("score", 0),
-                    },
-                )
 
+            self._log_master("INFO", f"Pipeline [{local_job_id}]: Iniciando agregación final de resultados.")
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.pipeline",
@@ -296,7 +444,7 @@ class GearmanDemoService:
                 "kind": "pipeline",
                 "task": "demo.pipeline",
                 "status": "completed",
-                "payload": payload,
+                "payload": {"text_chars": len(text), "shard_size": shard_size, "top_n": top_n},
                 "result": {
                     "stages": ["demo.shard", "demo.analyze"],
                     "gearman_jobs": 1 + len(shard_jobs),
@@ -305,6 +453,10 @@ class GearmanDemoService:
                     "shards": shard_jobs,
                 },
             }
+            
+            self._log_master("INFO", f"Pipeline Completado [{local_job_id}]", record["result"])
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.pipeline",
@@ -314,6 +466,9 @@ class GearmanDemoService:
                 details={"gearman_jobs": 1 + len(shard_jobs), "tokens": totals["tokens"]},
             )
         except Exception as exc:  # pragma: no cover - depende de red/gearmand
+            self._log_master("ERROR", f"Pipeline Fallido [{local_job_id}]: {exc}")
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task="demo.pipeline",
@@ -328,7 +483,7 @@ class GearmanDemoService:
                 "kind": "pipeline",
                 "task": "demo.pipeline",
                 "status": "failed",
-                "payload": payload,
+                "payload": {"text_chars": len(text), "shard_size": shard_size, "top_n": top_n},
                 "error": str(exc),
             }
             self._save_history(record)
@@ -339,6 +494,10 @@ class GearmanDemoService:
     def _run_sync(self, *, kind: str, task: str, payload: dict[str, Any]) -> dict[str, Any]:
         local_job_id = str(uuid.uuid4())
         now = self._now()
+        
+        self._log_master("INFO", f"Job Sync Iniciado [{local_job_id}]: kind={kind}, task={task}", payload)
+        self._log_pool_status()
+        
         self._log_event(
             local_job_id=local_job_id,
             task=task,
@@ -350,6 +509,10 @@ class GearmanDemoService:
 
         try:
             result = submit_sync_job(self._new_client(), task, {**payload, "_trace_job_id": local_job_id})
+            
+            self._log_master("INFO", f"Job Sync Completado [{local_job_id}]", result)
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task=task,
@@ -368,6 +531,9 @@ class GearmanDemoService:
                 "result": result,
             }
         except Exception as exc:  # pragma: no cover - depende de red/gearmand
+            self._log_master("ERROR", f"Job Sync Fallido [{local_job_id}]: {exc}")
+            self._log_pool_status()
+            
             self._log_event(
                 local_job_id=local_job_id,
                 task=task,

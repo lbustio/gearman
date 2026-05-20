@@ -14,6 +14,7 @@ from gearman_demo.domain.text_tasks import analyze_text, shard_text
 
 from .codec import decode_payload, encode_payload
 from .compat import apply_gearman3_python312_patch, gearman3_patch_status
+from .status_reporter import WorkerStatusReporter, monotonic_duration_ms
 from .telemetry import append_event, to_jsonable, worker_log_dir
 from .worker_assignment import task_names_for_worker
 
@@ -113,7 +114,13 @@ def summarize_worker_result(task_name: str, result: dict[str, Any]) -> dict[str,
     return summary
 
 
-def instrument_handler(task_name: str, handler: Any, worker_id: str, worker_logger: logging.Logger) -> Any:
+def instrument_handler(
+    task_name: str,
+    handler: Any,
+    worker_id: str,
+    worker_logger: logging.Logger,
+    status_reporter: WorkerStatusReporter,
+) -> Any:
     def wrapped_handler(gearman_worker: Any, gearman_job: Any) -> bytes:
         started_at = time.perf_counter()
         payload = decode_payload(gearman_job.data)
@@ -132,6 +139,12 @@ def instrument_handler(task_name: str, handler: Any, worker_id: str, worker_logg
             "JOB_RECEIVED",
             job_id=trace_job_id,
             task=task_name,
+            gearman_handle=handle,
+            details=base_details,
+        )
+        status_reporter.mark_started(
+            task=task_name,
+            job_id=trace_job_id,
             gearman_handle=handle,
             details=base_details,
         )
@@ -168,7 +181,13 @@ def instrument_handler(task_name: str, handler: Any, worker_id: str, worker_logg
         try:
             result = handler(gearman_worker, gearman_job)
         except Exception as exc:
-            duration_ms = (time.perf_counter() - started_at) * 1000
+            duration_ms = monotonic_duration_ms(started_at)
+            status_reporter.mark_failed(
+                task=task_name,
+                duration_ms=duration_ms,
+                error=str(exc),
+                details=base_details,
+            )
             log_worker_action(
                 worker_logger,
                 "JOB_FAILED",
@@ -192,7 +211,7 @@ def instrument_handler(task_name: str, handler: Any, worker_id: str, worker_logg
             )
             raise
 
-        duration_ms = (time.perf_counter() - started_at) * 1000
+        duration_ms = monotonic_duration_ms(started_at)
         result_details: dict[str, Any] = {"result_bytes": len(result or b"")}
         try:
             decoded_result = decode_payload(result)
@@ -212,6 +231,11 @@ def instrument_handler(task_name: str, handler: Any, worker_id: str, worker_logg
             task=task_name,
             gearman_handle=handle,
             duration_ms=round(duration_ms, 2),
+            details={**base_details, **result_details},
+        )
+        status_reporter.mark_finished(
+            task=task_name,
+            duration_ms=duration_ms,
             details={**base_details, **result_details},
         )
 
@@ -238,6 +262,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--worker-index", type=int, default=0, help="Índice del worker dentro del pool")
     parser.add_argument("--worker-count", type=int, default=1, help="Cantidad total de workers en el pool")
     parser.add_argument("--worker-id", default=None, help="Identificador legible del worker")
+    parser.add_argument(
+        "--api-url",
+        default=os.environ.get("GEARMAN_DEMO_API_URL"),
+        help="URL base de la API para reportar estado del worker",
+    )
     return parser
 
 
@@ -273,11 +302,33 @@ def main() -> None:
         "demo.bg_log": background_log_job,
     }
     task_names = tuple(task["name"] for task in TASK_CATALOG)
-    assigned_task_names = task_names_for_worker(task_names, args.worker_index, args.worker_count)
+    assigned_list = list(task_names_for_worker(task_names, args.worker_index, args.worker_count))
+    if "demo.analyze" not in assigned_list:
+        assigned_list.append("demo.analyze")
+    assigned_task_names = tuple(assigned_list)
+    
+    status_reporter = WorkerStatusReporter(
+        api_url=args.api_url,
+        worker_id=worker_id,
+        pid=os.getpid(),
+        worker_index=args.worker_index,
+        worker_count=args.worker_count,
+        registered_tasks=assigned_task_names,
+    )
     for task_name in assigned_task_names:
-        worker.register_task(task_name, instrument_handler(task_name, handlers[task_name], worker_id, worker_logger))
+        worker.register_task(
+            task_name,
+            instrument_handler(task_name, handlers[task_name], worker_id, worker_logger, status_reporter),
+        )
         log_worker_action(worker_logger, "TASK_REGISTERED", task=task_name)
 
+    status_reporter.mark_ready(
+        details={
+            "server": server,
+            "tasks": list(assigned_task_names),
+            "api_url": args.api_url,
+        }
+    )
     append_event(
         task="worker.lifecycle",
         stage="worker.register",

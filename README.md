@@ -1,84 +1,59 @@
-
 # Gearman Demo
 
-Demostración de Gearman en Python con arquitectura limpia, API FastAPI, consola web y worker pool dinámico.
+Demostración de Gearman en Python con arquitectura por responsabilidades, API FastAPI, consola web, worker pool dinámico y observabilidad por worker.
 
-## Estructura del proyecto
+## Estructura
 
-```
+```text
 src/gearman_demo/
-  domain/           # lógica pura: tokenización, análisis, sharding
-  gearman/          # adaptadores Gearman, telemetría, workers
-  application/      # casos de uso, historial, reportes, pipeline
+  domain/           # lógica pura: análisis de texto, sharding, catálogo de tareas
+  gearman/          # cliente, worker, codec, compatibilidad y telemetría Gearman
+  application/      # casos de uso, historial, reportes y pipeline
   interfaces/
     cli/            # demo por terminal
     http/           # API FastAPI y contratos Pydantic
-    web/            # consola web (index.html)
-scripts/            # runners para worker, API, demo
-main.py             # orquestador: levanta gearmand, workers y API
-install_all.sh      # instala TODO: sistema, entorno, dependencias
+    web/            # consola web
+scripts/            # runners para API, worker y demo CLI
+main.py             # orquestador: gearmand + API + workers
+install_all.sh      # instalación de sistema, venv y dependencias
+docs/               # notas de arquitectura
 ```
 
 ## Requisitos
 
 - Python 3.10+
-- gearmand (servidor Gearman)
+- `gearmand` disponible en el sistema
 
-## Instalación rápida (recomendada)
+Instalación rápida:
 
 ```bash
-cd /home/lbustio/Code/python/gearman
 bash install_all.sh
 source .venv/bin/activate
 ```
 
-Esto instala:
-- gearmand y dependencias de sistema (si es Linux/apt o yum)
-- entorno virtual Python y dependencias del proyecto
-- el paquete en modo editable
+Si `gearmand` no está instalado, en Linux/apt normalmente basta con:
 
-Si tu sistema no es compatible, instala gearmand y libgearman-dev manualmente.
+```bash
+sudo apt install gearman-job-server
+```
 
-## Ejecución unificada
+## Ejecución
 
 ```bash
 python main.py
 ```
 
-Esto levanta automáticamente:
-- gearmand (o usa uno ya corriendo)
-- un worker por CPU
-- la API FastAPI y la consola web
+Esto hace lo siguiente:
 
-Accede a la web en: http://127.0.0.1:8000/
-Swagger: http://127.0.0.1:8000/docs
-
-## Tareas y API
-
-Tareas registradas en Gearman:
-- `demo.analyze`: análisis de texto, tokens, sentimiento
-- `demo.shard`: particionado de texto
-- `demo.bg_log`: telemetría/log en background
-
-Caso de uso expuesto por API:
-- `POST /api/pipeline`: ejecuta `demo.shard` y luego `demo.analyze` por cada shard
-
-## Personalización y ayuda
-
-`python main.py --help` muestra todas las opciones (puertos, workers, etc).
-
----
-
-Ver también [docs/architecture.md](docs/architecture.md) para detalles de diseño.
-
-- usa automáticamente `.venv/bin/python` si existe;
-- inicia `gearmand` si el puerto `4730` está libre;
+- usa `.venv/bin/python` si existe;
+- inicia `gearmand` si no hay uno escuchando;
 - detecta CPUs con `os.cpu_count()`;
 - levanta un worker por CPU, con tope de 64;
-- arranca la API FastAPI;
+- asigna tareas a los workers con round-robin;
+- arranca la API antes de los workers para recibir sus reportes de estado;
 - expone la consola web.
 
-Abre:
+URLs:
 
 - Web: `http://127.0.0.1:8000/`
 - Swagger: `http://127.0.0.1:8000/docs`
@@ -90,12 +65,6 @@ Ctrl-C
 ```
 
 ## Worker Pool
-
-Por defecto:
-
-```bash
-python main.py
-```
 
 Forzar cantidad exacta de workers:
 
@@ -112,20 +81,44 @@ python main.py --max-workers 16
 Política de asignación:
 
 - Si hay más tareas que workers, un worker registra varias tareas.
-- Si hay más workers que tareas, las tareas se repiten round-robin.
-- Ejemplo: `cpu-01`, `cpu-02`, ..., `cpu-64`.
+- Si hay más workers que tareas, varias CPUs pueden ejecutar la misma tarea.
+- Los workers se nombran con padding estable: `cpu-01`, `cpu-02`, ..., `cpu-64`.
+
+## Tareas
+
+Tareas Gearman registradas:
+
+- `demo.analyze`: analiza texto, tokens y sentimiento.
+- `demo.shard`: divide texto en fragmentos.
+- `demo.bg_log`: ejecuta una acción background y deja telemetría.
+
+Caso de uso compuesto:
+
+- `POST /api/pipeline`: ejecuta `demo.shard` y luego `demo.analyze` por cada shard.
 
 ## Observabilidad
 
 La consola web muestra:
 
-- **Cuadro de mando Gearman**: workers, PID, tarea actual, estado y duración.
-- **Resultados por worker**: resumen de lo que produjo cada worker.
-- **Resultado seleccionado**: respuesta final/agregada del job.
-- **Logs de ejecución**: eventos de API y workers.
-- **Historial local**: jobs enviados desde la API.
+- estado reportado por cada worker por HTTP: ocupado/libre, PID, jobs en curso, jobs procesados, jobs fallidos, tarea actual, última tarea y duración;
+- resultados por worker;
+- resultado final/agregado del job;
+- logs de ejecución de API y workers;
+- historial local de jobs enviados desde la API.
 
-Eventos compartidos:
+Los workers usan `WorkerStatusReporter` para enviar su estado a la API con:
+
+```text
+POST /api/worker-status
+```
+
+La web consulta el estado agregado con:
+
+```text
+GET /api/workers-status
+```
+
+Telemetría compartida:
 
 ```text
 .runtime/events.jsonl
@@ -139,30 +132,24 @@ Logs humanos por worker:
 ...
 ```
 
-Ver logs en terminal:
+Ver un worker específico:
 
 ```bash
 tail -f .runtime/workers/cpu-01.log
 ```
 
-Cada log de worker documenta:
-
-- arranque del worker;
-- tareas registradas;
-- job recibido;
-- inicio de procesamiento;
-- resultado;
-- errores;
-- duración.
+Cada log de worker documenta arranque, tareas registradas, jobs recibidos, inicio, fin, duración, resultados y errores.
 
 ## Endpoints
 
-- `GET /api/health`: estado del API y servidor Gearman configurado.
-- `GET /api/tasks`: catálogo de tareas disponibles.
+- `GET /api/health`: estado de API y servidor Gearman configurado.
+- `GET /api/tasks`: catálogo de tareas.
 - `POST /api/analyze`: ejecuta `demo.analyze`.
 - `POST /api/shard`: ejecuta `demo.shard`.
 - `POST /api/background-log`: envía `demo.bg_log`.
 - `POST /api/pipeline`: orquesta `demo.shard` y `demo.analyze`.
+- `POST /api/worker-status`: recibe reportes de estado de workers.
+- `GET /api/workers-status`: lista el último estado reportado por cada worker.
 - `GET /api/jobs`: historial local de jobs.
 - `GET /api/jobs/{local_job_id}`: detalle de un job.
 - `GET /api/events`: últimos eventos de ejecución.
@@ -174,15 +161,13 @@ Cada log de worker documenta:
 1. Ejecuta `python main.py`.
 2. Abre `http://127.0.0.1:8000/`.
 3. Ejecuta `Pipeline`.
-4. Mira `Cuadro de mando Gearman`.
-5. Mira `Resultados por worker`.
-6. Mira `Resultado seleccionado`.
-7. Selecciona el job en el historial para filtrar sus eventos.
-8. Abre un log de worker con `tail -f .runtime/workers/cpu-01.log`.
+4. Mira el `Cuadro de mando Gearman`.
+5. Revisa `Resultados por worker`.
+6. Revisa `Resultado seleccionado`.
+7. Selecciona un job del historial para filtrar sus eventos.
+8. Mira el archivo de un worker con `tail -f .runtime/workers/cpu-01.log`.
 
 ## Ejecución Manual
-
-Usa estos comandos separados para depurar.
 
 Gearman server:
 
@@ -190,18 +175,18 @@ Gearman server:
 gearmand --listen=127.0.0.1 --port=4730 --verbose INFO
 ```
 
-Worker:
-
-```bash
-source .venv/bin/activate
-python scripts/run_worker.py --host 127.0.0.1 --port 4730 --worker-index 0 --worker-count 1 --worker-id cpu-01
-```
-
 API + web:
 
 ```bash
 source .venv/bin/activate
 python scripts/run_api.py --host 127.0.0.1 --port 4730 --api-host 127.0.0.1 --api-port 8000
+```
+
+Worker:
+
+```bash
+source .venv/bin/activate
+python scripts/run_worker.py --host 127.0.0.1 --port 4730 --worker-index 0 --worker-count 1 --worker-id cpu-01 --api-url http://127.0.0.1:8000
 ```
 
 Cliente CLI:
@@ -214,7 +199,6 @@ python scripts/run_demo.py "Gearman es excelente, rápido y productivo, aunque a
 ## Pruebas
 
 ```bash
-cd /home/lbustio/Code/python/gearman
 source .venv/bin/activate
 python -m unittest discover -s tests -v
 ```
@@ -229,9 +213,11 @@ python -m unittest discover -s tests -v
 
 Estos parches viven en `src/gearman_demo/gearman/compat.py` y están cubiertos por tests.
 
-## Limitaciones Actuales
+## Limitaciones
 
-- Historial y eventos de API viven en memoria del proceso API.
+- Historial y estado agregado de workers viven en memoria del proceso API.
 - Telemetría multiproceso se guarda en archivos locales bajo `.runtime/`.
 - El pipeline ejecuta los análisis de shards de forma secuencial desde la API.
 - Una versión más avanzada podría usar batch submit, persistencia externa y métricas Prometheus.
+
+Ver también [docs/architecture.md](docs/architecture.md).

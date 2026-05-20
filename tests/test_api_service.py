@@ -102,6 +102,33 @@ class GearmanDemoServiceTestCase(unittest.TestCase):
         self.assertEqual(events[0]["status"], "completed")
         self.assertEqual(events[-1]["status"], "running")
 
+    def test_worker_status_is_stored_and_sorted(self) -> None:
+        service = GearmanDemoService(client_factory=lambda: object())
+
+        service.update_worker_status(
+            {
+                "worker_id": "cpu-02",
+                "status": "busy",
+                "busy": True,
+                "jobs_processed": 3,
+                "updated_at": "2026-05-20T00:00:02+00:00",
+            }
+        )
+        service.update_worker_status(
+            {
+                "worker_id": "cpu-01",
+                "status": "ready",
+                "busy": False,
+                "jobs_processed": 5,
+                "updated_at": "2026-05-20T00:00:01+00:00",
+            }
+        )
+
+        statuses = service.list_worker_status()
+
+        self.assertEqual([status["worker_id"] for status in statuses], ["cpu-01", "cpu-02"])
+        self.assertEqual(statuses[0]["jobs_processed"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

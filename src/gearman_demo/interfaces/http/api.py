@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 from gearman_demo.application.service import GearmanDemoService, GearmanServiceError
 
-from .schemas import AnalyzeRequest, BackgroundLogRequest, PipelineRequest, ShardRequest
+from .schemas import AnalyzeRequest, BackgroundLogRequest, PipelineRequest, ShardRequest, WorkerStatusReport
 
 BASE_DIR = Path(__file__).resolve().parent
 INDEX_HTML = BASE_DIR.parent / "web" / "index.html"
@@ -20,6 +20,15 @@ def create_app(host: str = "127.0.0.1", port: int = 4730) -> FastAPI:
         description="API para gestionar y visualizar tareas del Gearman Demo",
     )
     service = GearmanDemoService(host=host, port=port)
+
+    @app.post("/api/worker-status")
+    def report_worker_status(report: WorkerStatusReport) -> dict:
+        status = service.update_worker_status(report.model_dump())
+        return {"ok": True, "worker_id": status["worker_id"]}
+
+    @app.get("/api/workers-status")
+    def get_workers_status() -> list[dict]:
+        return service.list_worker_status()
 
     @app.get("/", response_class=FileResponse)
     def webapp() -> FileResponse:
