@@ -1,103 +1,75 @@
+
 # Gearman Demo
 
-Proyecto para demostrar Gearman con Python usando una arquitectura separada por
-responsabilidades: dominio, adaptadores Gearman, casos de uso, API HTTP, CLI y
-consola web.
+Demostración de Gearman en Python con arquitectura limpia, API FastAPI, consola web y worker pool dinámico.
 
-Incluye:
+## Estructura del proyecto
 
-- Worker pool dinámico: un worker por CPU detectada, con tope configurable de 64.
-- Asignación de tareas por worker.
-- API FastAPI y consola web.
-- Pipeline fan-out/fan-in sobre Gearman.
-- Cuadro de mando con telemetría de workers.
-- Resultados por worker y resultado final agregado.
-- Logs independientes por worker.
-
-## Tareas
-
-Tareas registradas en Gearman:
-
-- `demo.analyze`: analiza texto, tokens, frecuencia de palabras y sentimiento básico.
-- `demo.shard`: particiona texto en chunks para simular distribución de trabajo.
-- `demo.bg_log`: recibe telemetría/log en background.
-
-Caso de uso expuesto por API:
-
-- `POST /api/pipeline`: ejecuta `demo.shard` y luego `demo.analyze` por cada shard.
-
-## Estructura
-
-```text
-src/gearman_demo/
-  domain/
-    text_tasks.py        # lógica pura: tokenización, análisis y sharding
-    task_catalog.py      # contrato de tareas publicadas por workers
-  gearman/
-    client.py            # envío de jobs a Gearman
-    codec.py             # JSON para payloads/resultados Gearman
-    compat.py            # parches de compatibilidad gearman3/Python 3.12+
-    telemetry.py         # eventos compartidos y logs por worker
-    worker_assignment.py # asignación de tareas por worker/CPU
-    worker.py            # worker Gearman instrumentado
-  application/
-    service.py           # casos de uso, historial, reportes y pipeline
-  interfaces/
-    cli/
-      client_demo.py     # demo por terminal
-    http/
-      api.py             # FastAPI
-      schemas.py         # contratos Pydantic
-    web/
-      index.html         # consola web
 ```
-
-Regla de dependencias:
-
-- `domain` no depende de Gearman, FastAPI ni CLI.
-- `gearman` adapta el protocolo Gearman y la telemetría.
-- `application` orquesta casos de uso y estado local.
-- `interfaces` expone HTTP, web y CLI.
-
-Ver también [docs/architecture.md](docs/architecture.md).
+src/gearman_demo/
+  domain/           # lógica pura: tokenización, análisis, sharding
+  gearman/          # adaptadores Gearman, telemetría, workers
+  application/      # casos de uso, historial, reportes, pipeline
+  interfaces/
+    cli/            # demo por terminal
+    http/           # API FastAPI y contratos Pydantic
+    web/            # consola web (index.html)
+scripts/            # runners para worker, API, demo
+main.py             # orquestador: levanta gearmand, workers y API
+install_all.sh      # instala TODO: sistema, entorno, dependencias
+```
 
 ## Requisitos
 
 - Python 3.10+
-- `gearmand` instalado para ejecutar jobs reales.
+- gearmand (servidor Gearman)
 
-Instalar `gearmand` en Ubuntu/Debian:
-
-```bash
-sudo apt install gearman-job-server
-```
-
-En macOS con Homebrew:
-
-```bash
-brew install gearman
-```
-
-El paquete Python usado es `gearman3`, que se importa como `gearman`.
-
-## Instalación
+## Instalación rápida (recomendada)
 
 ```bash
 cd /home/lbustio/Code/python/gearman
-python -m venv .venv
+bash install_all.sh
 source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e .
 ```
 
-## Ejecutar Todo
+Esto instala:
+- gearmand y dependencias de sistema (si es Linux/apt o yum)
+- entorno virtual Python y dependencias del proyecto
+- el paquete en modo editable
+
+Si tu sistema no es compatible, instala gearmand y libgearman-dev manualmente.
+
+## Ejecución unificada
 
 ```bash
-cd /home/lbustio/Code/python/gearman
 python main.py
 ```
 
-`main.py` hace lo siguiente:
+Esto levanta automáticamente:
+- gearmand (o usa uno ya corriendo)
+- un worker por CPU
+- la API FastAPI y la consola web
+
+Accede a la web en: http://127.0.0.1:8000/
+Swagger: http://127.0.0.1:8000/docs
+
+## Tareas y API
+
+Tareas registradas en Gearman:
+- `demo.analyze`: análisis de texto, tokens, sentimiento
+- `demo.shard`: particionado de texto
+- `demo.bg_log`: telemetría/log en background
+
+Caso de uso expuesto por API:
+- `POST /api/pipeline`: ejecuta `demo.shard` y luego `demo.analyze` por cada shard
+
+## Personalización y ayuda
+
+`python main.py --help` muestra todas las opciones (puertos, workers, etc).
+
+---
+
+Ver también [docs/architecture.md](docs/architecture.md) para detalles de diseño.
 
 - usa automáticamente `.venv/bin/python` si existe;
 - inicia `gearmand` si el puerto `4730` está libre;
