@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gearman Demo Console</title>
+    <style>
+      :root {
+        --bg: #f7f8fb;
+        --surface: #ffffff;
+        --surface-2: #eef2f7;
+        --ink: #172033;
+        --muted: #667085;
+        --line: #d8dee8;
+        --accent: #2563eb;
+        --accent-2: #0f766e;
+        --warn: #b45309;
+        --error: #b42318;
+        --ok: #087443;
+        --shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      .shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+      }
+
+      aside {
+        background: #111827;
+        color: #f9fafb;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 0.35rem;
+        font-size: 1.35rem;
+      }
+
+      .lede {
+        color: #cbd5e1;
+        line-height: 1.45;
+        margin-bottom: 0.35rem;
+      }
+
+      .server {
+        display: grid;
+        gap: 0.2rem;
+        padding: 0.8rem;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        font-size: 0.86rem;
+      }
+
+      .server code,
+      code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+      }
+
+      .task-list {
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .task-item {
+        padding: 0.7rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .task-item strong {
+        display: block;
+        font-size: 0.9rem;
+      }
+
+      .task-item span {
+        display: block;
+        margin-top: 0.2rem;
+        color: #cbd5e1;
+        font-size: 0.8rem;
+      }
+
+      main {
+        padding: 1.25rem;
+        display: grid;
+        gap: 1rem;
+        align-content: start;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(130px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(150px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .metric,
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .metric {
+        padding: 0.9rem;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 0.25rem;
+        font-size: 1.45rem;
+      }
+
+      .worker-board {
+        overflow: auto;
+        max-height: 260px;
+      }
+
+      .worker-board table {
+        font-size: 0.84rem;
+      }
+
+      .worker-results {
+        overflow: auto;
+        max-height: 320px;
+      }
+
+      .worker-results table {
+        font-size: 0.84rem;
+      }
+
+      .summary-json {
+        max-width: 360px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.78rem;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.25fr);
+        gap: 1rem;
+        align-items: start;
+      }
+
+      .panel {
+        overflow: hidden;
+      }
+
+      .panel header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfe;
+      }
+
+      .panel h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .panel-body {
+        padding: 1rem;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+
+      .tab {
+        border: 1px solid var(--line);
+        background: var(--surface-2);
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .tab.active {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: white;
+      }
+
+      .form {
+        display: none;
+      }
+
+      .form.active {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      label {
+        display: grid;
+        gap: 0.35rem;
+        color: var(--muted);
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.65rem 0.72rem;
+        color: var(--ink);
+        background: white;
+      }
+
+      textarea {
+        min-height: 130px;
+        resize: vertical;
+        line-height: 1.45;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.55rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .primary,
+      .secondary {
+        border: 0;
+        border-radius: 8px;
+        color: white;
+        padding: 0.65rem 0.9rem;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: var(--accent);
+      }
+
+      .secondary {
+        background: var(--accent-2);
+      }
+
+      .ghost {
+        border: 1px solid var(--line);
+        background: white;
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.55rem 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .status {
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1rem;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        max-height: 360px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+
+      th,
+      td {
+        padding: 0.58rem 0.5rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        background: #fbfcfe;
+        position: sticky;
+        top: 0;
+      }
+
+      tr {
+        cursor: pointer;
+      }
+
+      tr:hover td {
+        background: #f8fafc;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.18rem 0.48rem;
+        font-size: 0.76rem;
+        font-weight: 800;
+        background: #e0f2fe;
+        color: #075985;
+      }
+
+      .pill.completed,
+      .pill.accepted {
+        background: #dcfce7;
+        color: var(--ok);
+      }
+
+      .pill.failed {
+        background: #fee2e2;
+        color: var(--error);
+      }
+
+      .result-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.65rem;
+        margin-bottom: 0.8rem;
+      }
+
+      .result-stat {
+        padding: 0.7rem;
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .result-stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .result-stat strong {
+        display: block;
+        margin-top: 0.15rem;
+      }
+
+      pre {
+        margin: 0;
+        background: #111827;
+        color: #e5e7eb;
+        border-radius: 8px;
+        padding: 0.85rem;
+        overflow: auto;
+        max-height: 380px;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .log-list {
+        display: grid;
+        gap: 0.55rem;
+        max-height: 360px;
+        overflow: auto;
+        background: #111827;
+        color: #e5e7eb;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.8rem;
+      }
+
+      .log-entry {
+        display: grid;
+        grid-template-columns: 5.6rem 5.8rem minmax(6rem, 8rem) minmax(0, 1fr);
+        gap: 0.55rem;
+        align-items: start;
+        padding-bottom: 0.45rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .log-entry:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .log-time,
+      .log-stage {
+        color: #9ca3af;
+      }
+
+      .log-status {
+        display: inline-flex;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 0.08rem 0.38rem;
+        color: #dbeafe;
+        background: rgba(37, 99, 235, 0.28);
+      }
+
+      .log-status.completed,
+      .log-status.accepted {
+        color: #bbf7d0;
+        background: rgba(8, 116, 67, 0.35);
+      }
+
+      .log-status.failed {
+        color: #fecaca;
+        background: rgba(180, 35, 24, 0.35);
+      }
+
+      .log-main strong {
+        color: white;
+        display: block;
+      }
+
+      .log-main span {
+        display: block;
+        color: #cbd5e1;
+        margin-top: 0.14rem;
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        aside {
+          min-height: auto;
+        }
+
+        .metrics,
+        .dashboard-grid,
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 560px) {
+        main,
+        aside {
+          padding: 0.9rem;
+        }
+
+        .row,
+        .dashboard-grid,
+        .result-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside>
+        <div>
+          <h1>Gearman Demo</h1>
+          <p class="lede">Consola para enviar jobs, observar historial local y demostrar sync, background y pipeline.</p>
+        </div>
+        <div class="server">
+          <span>Job server</span>
+          <code id="server">consultando...</code>
+        </div>
+        <section>
+          <h2>Workers registrados</h2>
+          <div class="task-list" id="task-list"></div>
+        </section>
+      </aside>
+
+      <main>
+        <section class="metrics">
+          <div class="metric"><span>Total jobs</span><strong id="m-total">0</strong></div>
+          <div class="metric"><span>Analyze</span><strong id="m-analyze">0</strong></div>
+          <div class="metric"><span>Shard</span><strong id="m-shard">0</strong></div>
+          <div class="metric"><span>Pipeline</span><strong id="m-pipeline">0</strong></div>
+          <div class="metric"><span>Fallidos</span><strong id="m-failed">0</strong></div>
+        </section>
+
+        <section class="dashboard-grid">
+          <div class="metric"><span>Workers vistos</span><strong id="d-workers">0</strong></div>
+          <div class="metric"><span>En ejecución</span><strong id="d-running">0</strong></div>
+          <div class="metric"><span>Tareas terminadas</span><strong id="d-completed">0</strong></div>
+          <div class="metric"><span>Duración promedio</span><strong id="d-avg">-</strong></div>
+        </section>
+
+        <section class="panel">
+          <header>
+            <h2>Cuadro de mando Gearman</h2>
+            <span class="status" id="dashboard-status">esperando eventos</span>
+          </header>
+          <div class="worker-board">
+            <table>
+              <thead>
+                <tr>
+                  <th>worker</th>
+                  <th>pid</th>
+                  <th>estado</th>
+                  <th>tarea</th>
+                  <th>etapa</th>
+                  <th>duración</th>
+                  <th>último evento</th>
+                </tr>
+              </thead>
+              <tbody id="worker-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <article class="panel">
+            <header>
+              <h2>Enviar trabajo</h2>
+              <span class="status" id="run-status">listo</span>
+            </header>
+            <div class="panel-body">
+              <nav class="tabs">
+                <button class="tab active" data-tab="pipeline">Pipeline</button>
+                <button class="tab" data-tab="analyze">Analyze</button>
+                <button class="tab" data-tab="shard">Shard</button>
+                <button class="tab" data-tab="bg">Background</button>
+              </nav>
+
+              <form class="form active" id="form-pipeline">
+                <label>
+                  Texto
+                  <textarea id="pipeline-text">Gearman permite distribuir trabajo. Este pipeline divide texto en shards, analiza cada parte y agrega métricas por medio de jobs.</textarea>
+                </label>
+                <div class="row">
+                  <label>Shard size <input id="pipeline-shard-size" type="number" min="1" max="2000" value="55" /></label>
+                  <label>Top tokens <input id="pipeline-top-n" type="number" min="1" max="50" value="5" /></label>
+                </div>
+                <div class="actions">
+                  <button class="primary" type="submit">Ejecutar pipeline</button>
+                </div>
+              </form>
+
+              <form class="form" id="form-analyze">
+                <label>
+                  Texto
+                  <textarea id="analyze-text">Gearman es excelente y productivo, aunque a veces puede fallar por un bug.</textarea>
+                </label>
+                <label>Top tokens <input id="top-n" type="number" min="1" max="50" value="5" /></label>
+                <div class="actions">
+                  <button class="primary" type="submit">Ejecutar analyze</button>
+                </div>
+              </form>
+
+              <form class="form" id="form-shard">
+                <label>
+                  Texto
+                  <textarea id="shard-text">Divide este texto en partes para simular distribución de trabajo en Gearman.</textarea>
+                </label>
+                <label>Shard size <input id="shard-size" type="number" min="1" max="2000" value="60" /></label>
+                <div class="actions">
+                  <button class="secondary" type="submit">Ejecutar shard</button>
+                </div>
+              </form>
+
+              <form class="form" id="form-bg">
+                <label>
+                  Mensaje
+                  <textarea id="bg-message">Evento webapp: operación iniciada desde FastAPI UI</textarea>
+                </label>
+                <div class="actions">
+                  <button class="primary" type="submit">Enviar background log</button>
+                </div>
+              </form>
+            </div>
+          </article>
+
+          <div class="split">
+            <article class="panel">
+              <header>
+                <h2>Historial local</h2>
+                <button class="ghost" id="refresh" type="button">Actualizar</button>
+              </header>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>id</th>
+                      <th>kind</th>
+                      <th>status</th>
+                      <th>task</th>
+                      <th>timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody id="jobs-table"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="panel">
+              <header>
+                <h2>Resultado seleccionado</h2>
+                <span class="status" id="selected-id">sin selección</span>
+              </header>
+              <div class="panel-body">
+                <div class="result-grid" id="result-summary"></div>
+                <pre id="response">{ "info": "Aún no hay ejecuciones" }</pre>
+              </div>
+            </article>
+
+            <article class="panel">
+              <header>
+                <h2>Resultados por worker</h2>
+                <span class="status" id="worker-results-scope">sin selección</span>
+              </header>
+              <div class="worker-results">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>worker</th>
+                      <th>tarea</th>
+                      <th>duración</th>
+                      <th>resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="worker-results-table"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="panel">
+              <header>
+                <h2>Logs de ejecución</h2>
+                <span class="status" id="log-scope">últimos eventos</span>
+              </header>
+              <div class="panel-body">
+                <div class="log-list" id="event-log"></div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let jobs = [];
+      let selectedJobId = null;
+      let logTimer = null;
+
+      async function api(path, options = {}) {
+        const res = await fetch(path, {
+          headers: { "Content-Type": "application/json" },
+          ...options,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "Error desconocido");
+        return data;
+      }
+
+      function setStatus(text, failed = false) {
+        $("run-status").textContent = text;
+        $("run-status").style.color = failed ? "var(--error)" : "var(--muted)";
+      }
+
+      function renderTasks(tasks) {
+        $("task-list").innerHTML = tasks
+          .map(
+            (task) => `
+              <div class="task-item">
+                <strong>${task.name}</strong>
+                <span>${task.mode} · ${task.description}</span>
+              </div>`
+          )
+          .join("");
+      }
+
+      function renderMetrics(report) {
+        const totals = report.totals || {};
+        $("m-total").textContent = report.total_jobs || 0;
+        $("m-analyze").textContent = totals.analyze || 0;
+        $("m-shard").textContent = totals.shard || 0;
+        $("m-pipeline").textContent = totals.pipeline || 0;
+        $("m-failed").textContent = totals.failed || 0;
+      }
+
+      function renderJobs(nextJobs) {
+        jobs = nextJobs;
+        $("jobs-table").innerHTML =
+          jobs
+            .map(
+              (job) => `
+                <tr data-id="${job.id}">
+                  <td><code>${job.id.slice(0, 8)}</code></td>
+                  <td>${job.kind}</td>
+                  <td><span class="pill ${job.status}">${job.status}</span></td>
+                  <td><code>${job.task}</code></td>
+                  <td>${new Date(job.created_at).toLocaleString()}</td>
+                </tr>`
+            )
+            .join("") || "<tr><td colspan='5'>Sin jobs</td></tr>";
+      }
+
+      function summarize(job) {
+        const result = job.result || {};
+        const totals = result.totals || result;
+        const stats = [
+          ["Gearman jobs", result.gearman_jobs || 1],
+          ["Shards", result.shard_count || result.count || "-"],
+          ["Tokens", totals.tokens || "-"],
+        ];
+        $("result-summary").innerHTML = stats
+          .map(([label, value]) => `<div class="result-stat"><span>${label}</span><strong>${value}</strong></div>`)
+          .join("");
+      }
+
+      function renderResponse(job) {
+        $("selected-id").textContent = job.id ? job.id.slice(0, 8) : "respuesta";
+        summarize(job);
+        $("response").textContent = JSON.stringify(job, null, 2);
+      }
+
+      function renderEvents(events) {
+        $("event-log").innerHTML =
+          events
+            .map((event) => {
+              const time = new Date(event.created_at).toLocaleTimeString();
+              const details = Object.keys(event.details || {}).length
+                ? JSON.stringify(event.details)
+                : "";
+              return `
+                <div class="log-entry">
+                  <span class="log-time">${time}</span>
+                  <span class="log-status ${event.status}">${event.status}</span>
+                  <span class="log-stage">${event.stage}</span>
+                  <span class="log-main">
+                    <strong>${event.task}</strong>
+                    <span>${event.message}${details ? ` · ${details}` : ""}</span>
+                  </span>
+                </div>`;
+            })
+            .join("") || "<div class='log-entry'><span></span><span></span><span></span><span>Sin eventos</span></div>";
+      }
+
+      function renderWorkerDashboard(events) {
+        const workerEvents = events.filter((event) => event.worker_id);
+        const workers = new Map();
+        workerEvents
+          .slice()
+          .reverse()
+          .forEach((event) => {
+            workers.set(event.worker_id, event);
+          });
+
+        const completed = workerEvents.filter((event) => event.status === "completed");
+        const durations = completed
+          .map((event) => Number(event.duration_ms))
+          .filter((value) => Number.isFinite(value));
+        const avg = durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : null;
+
+        $("d-workers").textContent = workers.size;
+        $("d-running").textContent = Array.from(workers.values()).filter((event) =>
+          ["received", "running"].includes(event.status)
+        ).length;
+        $("d-completed").textContent = completed.length;
+        $("d-avg").textContent = avg === null ? "-" : `${avg.toFixed(1)} ms`;
+        $("dashboard-status").textContent = workerEvents.length
+          ? `${workerEvents.length} eventos worker`
+          : "sin eventos worker todavía";
+
+        const rows = Array.from(workers.entries())
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([workerId, event]) => {
+            const duration = event.duration_ms == null ? "-" : `${Number(event.duration_ms).toFixed(1)} ms`;
+            return `
+              <tr>
+                <td><code>${workerId}</code></td>
+                <td>${event.pid || "-"}</td>
+                <td><span class="pill ${event.status}">${event.status}</span></td>
+                <td><code>${event.task}</code></td>
+                <td>${event.stage}</td>
+                <td>${duration}</td>
+                <td>${event.message}</td>
+              </tr>`;
+          })
+          .join("");
+        $("worker-table").innerHTML = rows || "<tr><td colspan='7'>Sin eventos de workers</td></tr>";
+      }
+
+      function renderWorkerResults(events) {
+        const completedResults = events
+          .filter(
+            (event) =>
+              event.worker_id &&
+              event.status === "completed" &&
+              event.details &&
+              event.details.result_summary
+          )
+          .slice()
+          .reverse();
+
+        $("worker-results-scope").textContent = selectedJobId
+          ? `job ${selectedJobId.slice(0, 8)}`
+          : "últimos resultados";
+
+        const rows = completedResults
+          .map((event) => {
+            const duration = event.duration_ms == null ? "-" : `${Number(event.duration_ms).toFixed(1)} ms`;
+            return `
+              <tr>
+                <td><code>${event.worker_id}</code></td>
+                <td><code>${event.task}</code></td>
+                <td>${duration}</td>
+                <td class="summary-json">${JSON.stringify(event.details.result_summary, null, 2)}</td>
+              </tr>`;
+          })
+          .join("");
+        $("worker-results-table").innerHTML =
+          rows || "<tr><td colspan='4'>Sin resultados de workers para mostrar</td></tr>";
+      }
+
+      async function refreshEvents() {
+        const [globalEvents, scopedEvents] = await Promise.all([
+          api("/api/events?limit=250"),
+          selectedJobId ? api(`/api/jobs/${selectedJobId}/events?limit=250`) : api("/api/events?limit=250"),
+        ]);
+        $("log-scope").textContent = selectedJobId ? `job ${selectedJobId.slice(0, 8)}` : "últimos eventos";
+        renderWorkerDashboard(globalEvents);
+        renderWorkerResults(scopedEvents);
+        renderEvents(scopedEvents);
+      }
+
+      function startLogPolling() {
+        if (logTimer) return;
+        logTimer = window.setInterval(() => refreshEvents().catch(() => {}), 1000);
+      }
+
+      function stopLogPollingSoon() {
+        window.setTimeout(() => {
+          if (!logTimer) return;
+          window.clearInterval(logTimer);
+          logTimer = null;
+          refreshEvents().catch(() => {});
+        }, 1500);
+      }
+
+      async function refresh() {
+        const [report, nextJobs] = await Promise.all([api("/api/report"), api("/api/jobs")]);
+        renderMetrics(report);
+        renderTasks(report.tasks || []);
+        renderJobs(nextJobs);
+        await refreshEvents();
+      }
+
+      async function run(path, body) {
+        setStatus("ejecutando...");
+        selectedJobId = null;
+        startLogPolling();
+        try {
+          const job = await api(path, { method: "POST", body: JSON.stringify(body) });
+          selectedJobId = job.id || null;
+          renderResponse(job);
+          await refresh();
+          setStatus("completado");
+        } catch (err) {
+          setStatus(String(err), true);
+          renderResponse({ error: String(err) });
+          await refreshEvents().catch(() => {});
+        } finally {
+          stopLogPollingSoon();
+        }
+      }
+
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+          document.querySelectorAll(".form").forEach((item) => item.classList.remove("active"));
+          tab.classList.add("active");
+          $(`form-${tab.dataset.tab}`).classList.add("active");
+        });
+      });
+
+      $("form-pipeline").addEventListener("submit", (event) => {
+        event.preventDefault();
+        run("/api/pipeline", {
+          text: $("pipeline-text").value,
+          shard_size: Number($("pipeline-shard-size").value || 120),
+          top_n: Number($("pipeline-top-n").value || 5),
+        });
+      });
+
+      $("form-analyze").addEventListener("submit", (event) => {
+        event.preventDefault();
+        run("/api/analyze", {
+          text: $("analyze-text").value,
+          top_n: Number($("top-n").value || 5),
+        });
+      });
+
+      $("form-shard").addEventListener("submit", (event) => {
+        event.preventDefault();
+        run("/api/shard", {
+          text: $("shard-text").value,
+          shard_size: Number($("shard-size").value || 120),
+        });
+      });
+
+      $("form-bg").addEventListener("submit", (event) => {
+        event.preventDefault();
+        run("/api/background-log", { message: $("bg-message").value });
+      });
+
+      $("jobs-table").addEventListener("click", (event) => {
+        const row = event.target.closest("tr[data-id]");
+        if (!row) return;
+        const job = jobs.find((item) => item.id === row.dataset.id);
+        if (job) {
+          selectedJobId = job.id;
+          renderResponse(job);
+          refreshEvents().catch(() => {});
+        }
+      });
+
+      $("refresh").addEventListener("click", refresh);
+
+      async function bootstrap() {
+        try {
+          const health = await api("/api/health");
+          $("server").textContent = health.gearman_server;
+          await refresh();
+        } catch (err) {
+          $("server").textContent = "sin conexión";
+          setStatus(String(err), true);
+        }
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>

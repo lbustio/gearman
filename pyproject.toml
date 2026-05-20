@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gearman-demo"
+version = "0.1.0"
+description = "Demostración de Gearman en Python"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "gearman3==0.2.1",
+  "fastapi==0.115.0",
+  "uvicorn==0.30.6",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+gearman_demo = ["interfaces/web/*.html"]

@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging/build artifacts
+*.egg-info/
+build/
+dist/
+*.egg
+
+# Runtime output
+.runtime/
+*.log
+
+# Test/tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local/editor files
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+
+# Codex/session metadata
+.agents/
+.codex/
+.gitlocal/
