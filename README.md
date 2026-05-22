@@ -96,11 +96,25 @@ Caso de uso compuesto:
 
 - `POST /api/pipeline`: ejecuta `demo.shard` y luego `demo.analyze` por cada shard.
 
+## Consola Web
+
+La consola web está disponible en `http://127.0.0.1:8000/` cuando se ejecuta `python main.py` o el runner de API.
+
+La interfaz está organizada por tabs principales:
+
+- `Monitor`: muestra métricas generales, ocupación de workers, gráficas de actividad y el cuadro de mando por worker.
+- `Ejecutar`: permite enviar trabajos `Pipeline`, `Analyze`, `Shard` y `Background`.
+- `Historial`: lista jobs locales, muestra el resultado seleccionado y los resultados reportados por worker.
+- `Logs`: muestra los eventos de ejecución de API y workers; al seleccionar un job en `Historial`, los logs se filtran por ese job.
+
+Dentro de `Ejecutar`, hay tabs secundarios para elegir el tipo de trabajo que se enviará a Gearman.
+
 ## Observabilidad
 
 La consola web muestra:
 
 - estado reportado por cada worker por HTTP: ocupado/libre, PID, jobs en curso, jobs procesados, jobs fallidos, tarea actual, última tarea y duración;
+- ocupación visual del pool de workers;
 - resultados por worker;
 - resultado final/agregado del job;
 - logs de ejecución de API y workers;
@@ -160,11 +174,11 @@ Cada log de worker documenta arranque, tareas registradas, jobs recibidos, inici
 
 1. Ejecuta `python main.py`.
 2. Abre `http://127.0.0.1:8000/`.
-3. Ejecuta `Pipeline`.
-4. Mira el `Cuadro de mando Gearman`.
-5. Revisa `Resultados por worker`.
-6. Revisa `Resultado seleccionado`.
-7. Selecciona un job del historial para filtrar sus eventos.
+3. Entra al tab `Ejecutar` y ejecuta `Pipeline`.
+4. Vuelve a `Monitor` para ver la ocupación de workers y el `Cuadro de mando Gearman`.
+5. Entra a `Historial` para seleccionar el job y revisar `Resultado seleccionado`.
+6. Revisa `Resultados por worker` en el mismo tab.
+7. Entra a `Logs` para ver los eventos filtrados por el job seleccionado.
 8. Mira el archivo de un worker con `tail -f .runtime/workers/cpu-01.log`.
 
 ## Ejecución Manual

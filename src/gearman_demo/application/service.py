@@ -152,15 +152,15 @@ class GearmanDemoService:
             
         # Registrar cambios de estado significativos
         if (
-            not old 
-            or old.get("status") != clean_status["status"] 
-            or old.get("busy") != clean_status["busy"] 
-            or old.get("current_task") != clean_status["current_task"]
+            not old
+            or old.get("status") != clean_status.get("status")
+            or old.get("busy") != clean_status.get("busy")
+            or old.get("current_task") != clean_status.get("current_task")
         ):
             self._log_master(
                 "INFO",
-                f"Worker {worker_id} (PID {clean_status['pid']}) reporta cambio de estado: "
-                f"status={clean_status['status']} (busy: {clean_status['busy']}, task: {clean_status['current_task'] or 'ninguna'})"
+                f"Worker {worker_id} (PID {clean_status.get('pid', 'desconocido')}) reporta cambio de estado: "
+                f"status={clean_status.get('status')} (busy: {clean_status.get('busy')}, task: {clean_status.get('current_task') or 'ninguna'})"
             )
             self._log_pool_status()
             

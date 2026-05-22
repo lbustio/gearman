@@ -111,6 +111,8 @@ class GearmanDemoServiceTestCase(unittest.TestCase):
                 "status": "busy",
                 "busy": True,
                 "jobs_processed": 3,
+                "pid": 1002,
+                "current_task": "demo.analyze",
                 "updated_at": "2026-05-20T00:00:02+00:00",
             }
         )
@@ -120,6 +122,8 @@ class GearmanDemoServiceTestCase(unittest.TestCase):
                 "status": "ready",
                 "busy": False,
                 "jobs_processed": 5,
+                "pid": 1001,
+                "current_task": None,
                 "updated_at": "2026-05-20T00:00:01+00:00",
             }
         )

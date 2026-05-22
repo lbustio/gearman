@@ -505,6 +505,36 @@
         }
       }
 
+      /* Main Page Tabs */
+      .main-tabs {
+        display: flex;
+        gap: 0.25rem;
+        border-bottom: 2px solid var(--line);
+        margin-bottom: 1rem;
+      }
+      .main-tab {
+        border: none;
+        background: none;
+        color: var(--muted);
+        padding: 0.7rem 1.25rem;
+        font-weight: 700;
+        font-size: 0.88rem;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        border-radius: 6px 6px 0 0;
+        transition: color 0.15s, background 0.15s, border-color 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .main-tab:hover { color: var(--ink); background: var(--surface-2); }
+      .main-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+      .main-tab-panel { display: none; flex-direction: column; gap: 1rem; }
+      .main-tab-panel.active { display: flex; }
+      .two-col-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+      @media (max-width: 960px) { .two-col-panels { grid-template-columns: 1fr; } }
+
       /* Visual Dashboard CSS styles */
       .visual-panel {
         background: var(--surface);
@@ -800,6 +830,17 @@
           <div class="metric"><span>Duración promedio</span><strong id="d-avg">-</strong></div>
         </section>
 
+        <!-- NAVEGACIÓN PRINCIPAL POR TABS -->
+        <nav class="main-tabs">
+          <button class="main-tab active" data-main-tab="monitor" id="btn-monitor">🖥️ Monitor</button>
+          <button class="main-tab" data-main-tab="ejecutar" id="btn-ejecutar">⚡ Ejecutar</button>
+          <button class="main-tab" data-main-tab="historial" id="btn-historial">📋 Historial</button>
+          <button class="main-tab" data-main-tab="logs" id="btn-logs">📊 Logs</button>
+        </nav>
+
+        <!-- TAB: MONITOR -->
+        <div class="main-tab-panel active" id="tab-monitor">
+
         <!-- PANEL GRÁFICO DE OCUPACIÓN -->
         <section class="visual-panel">
           <header class="panel-header-visual">
@@ -863,7 +904,10 @@
           </div>
         </section>
 
-        <section class="workspace">
+        </div>
+
+        <!-- TAB: EJECUTAR -->
+        <div class="main-tab-panel" id="tab-ejecutar">
           <article class="panel">
             <header>
               <h2>Enviar trabajo</h2>
@@ -924,8 +968,11 @@
               </form>
             </div>
           </article>
+        </div>
 
-          <div class="split">
+        <!-- TAB: HISTORIAL -->
+        <div class="main-tab-panel" id="tab-historial">
+          <div class="two-col-panels">
             <article class="panel">
               <header>
                 <h2>Historial local</h2>
@@ -957,38 +1004,41 @@
                 <pre id="response">{ "info": "Aún no hay ejecuciones" }</pre>
               </div>
             </article>
-
-            <article class="panel">
-              <header>
-                <h2>Resultados por worker</h2>
-                <span class="status" id="worker-results-scope">sin selección</span>
-              </header>
-              <div class="worker-results">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>worker</th>
-                      <th>tarea</th>
-                      <th>duración</th>
-                      <th>resultado</th>
-                    </tr>
-                  </thead>
-                  <tbody id="worker-results-table"></tbody>
-                </table>
-              </div>
-            </article>
-
-            <article class="panel">
-              <header>
-                <h2>Logs de ejecución</h2>
-                <span class="status" id="log-scope">últimos eventos</span>
-              </header>
-              <div class="panel-body">
-                <div class="log-list" id="event-log"></div>
-              </div>
-            </article>
           </div>
-        </section>
+
+          <article class="panel">
+            <header>
+              <h2>Resultados por worker</h2>
+              <span class="status" id="worker-results-scope">sin selección</span>
+            </header>
+            <div class="worker-results">
+              <table>
+                <thead>
+                  <tr>
+                    <th>worker</th>
+                    <th>tarea</th>
+                    <th>duración</th>
+                    <th>resultado</th>
+                  </tr>
+                </thead>
+                <tbody id="worker-results-table"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <!-- TAB: LOGS -->
+        <div class="main-tab-panel" id="tab-logs">
+          <article class="panel">
+            <header>
+              <h2>Logs de ejecución</h2>
+              <span class="status" id="log-scope">últimos eventos</span>
+            </header>
+            <div class="panel-body">
+              <div class="log-list" id="event-log"></div>
+            </div>
+          </article>
+        </div>
       </main>
     </div>
 
@@ -1388,6 +1438,16 @@
           document.querySelectorAll(".form").forEach((item) => item.classList.remove("active"));
           tab.classList.add("active");
           $(`form-${tab.dataset.tab}`).classList.add("active");
+        });
+      });
+
+      document.querySelectorAll(".main-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const panelId = `tab-${tab.dataset.mainTab}`;
+          document.querySelectorAll(".main-tab").forEach((item) => item.classList.remove("active"));
+          document.querySelectorAll(".main-tab-panel").forEach((item) => item.classList.remove("active"));
+          tab.classList.add("active");
+          $(panelId).classList.add("active");
         });
       });
 
